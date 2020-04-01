@@ -22,7 +22,7 @@ func main() {
 	listener := p4.OpenStreamListener(stream)
 
 	p4.SetMastership(stream)
-	p4.SetPipelineConfigFromFile(client, "resources/p4info.p4")
+	p4.SetPipelineConfigFromFile(client, "resources/p4info.txt")
 	p4.PrintTables(client)
 
 	table := p4Config.CreateTable()
