@@ -2,8 +2,9 @@ package p4lib
 
 import (
 	"fmt"
-	p4Config "github.com/antonjlin/p4-go/p4/config/v1"
-	p4 "github.com/antonjlin/p4-go/p4/v1"
+
+	p4Config "github.com/distrue/gencachectrl/p4/config/v1"
+	p4 "github.com/distrue/gencachectrl/p4/v1"
 )
 
 type ConfigBuilder struct {
@@ -29,7 +30,6 @@ func CreateConfigBuilder(client p4.P4RuntimeClient) ConfigBuilder {
 	return builder
 }
 
-func (builder *ConfigBuilder) AddTableEntry(table p4Config.Table){
+func (builder *ConfigBuilder) AddTableEntry(table p4Config.Table) {
 	builder.Config.Tables = append(builder.Config.Tables, &table)
 }
-

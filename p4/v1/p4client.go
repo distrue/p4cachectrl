@@ -3,14 +3,15 @@ package p4_v1
 import (
 	"context"
 	"fmt"
-	p4config "github.com/antonjlin/p4-go/p4/config/v1"
-	"github.com/golang/protobuf/proto"
-	"github.com/pkg/errors"
-	"google.golang.org/grpc"
 	"io"
 	"io/ioutil"
 	"log"
 	"sync"
+
+	p4config "github.com/distrue/gencachectrl/p4/config/v1"
+	"github.com/golang/protobuf/proto"
+	"github.com/pkg/errors"
+	"google.golang.org/grpc"
 )
 
 //protoc --go_out=paths=source_relative:. --proto_path=proto/ proto/p4-go/status.proto
@@ -36,8 +37,6 @@ func GetPipelineConfigs(client P4RuntimeClient) (*p4config.P4Info, error) {
 	}
 	return reply.GetConfig().P4Info, nil
 }
-
-
 
 func PrintTables(client P4RuntimeClient) {
 	res, err := GetPipelineConfigs(client)
