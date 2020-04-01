@@ -10,21 +10,7 @@ import (
 	p4 "github.com/distrue/gencachectrl/p4/v1"
 )
 
-func main() {
-
-	client := p4.GetClient("localhost:50051")
-	stream, sErr := client.StreamChannel(context.Background())
-	if sErr != nil {
-		fmt.Println(sErr)
-		log.Fatalf("cannot open stream channel with the server")
-	}
-
-	listener := p4.OpenStreamListener(stream)
-
-	p4.SetMastership(stream)
-	p4.SetPipelineConfigFromFile(client, "resources/p4info.txt")
-	p4.PrintTables(client)
-
+func setTableExample(client p4.P4RuntimeClient) {
 	table := p4Config.CreateTable()
 	table.AddPreamble(
 		p4Config.CreatePreamble(
@@ -81,6 +67,24 @@ func main() {
 	fmt.Printf("%+v\n", info)
 
 	p4.SetPipelineConfig(client, &info)
+}
+
+func main() {
+
+	client := p4.GetClient("localhost:50051")
+	stream, sErr := client.StreamChannel(context.Background())
+	if sErr != nil {
+		fmt.Println(sErr)
+		log.Fatalf("cannot open stream channel with the server")
+	}
+
+	listener := p4.OpenStreamListener(stream)
+
+	p4.SetMastership(stream)
+	p4.SetPipelineConfigFromFile(client, "resources/p4info.txt")
+	p4.PrintTables(client)
+
+	// setTableExample(client)
 	time.Sleep(1000 * time.Millisecond)
 
 	newConfig, err := p4.GetPipelineConfigs(client)
@@ -88,6 +92,29 @@ func main() {
 		log.Fatal(err)
 	}
 	fmt.Printf("%+v\n", newConfig)
+
+	req := p4.StreamMessageRequest{
+		Update: &p4.StreamMessageRequest_Packet{
+			Packet: &p4.PacketOut{
+				Payload: []byte("PAYLOAD"), // []byte
+				Metadata: []*p4.PacketMetadata{
+					&p4.PacketMetadata{},
+				},
+				XXX_NoUnkeyedLiteral: struct{}{},
+				XXX_unrecognized:     []byte("unrecognized"), // []byte
+				XXX_sizecache:        2048,
+			},
+		},
+	}
+
+	err = stream.Send(&req)
+	if err != nil {
+		fmt.Println("ERROR SENDING STREAM REQUEST:")
+		fmt.Println(err)
+	}
+
+	ans, err := stream.Recv()
+	fmt.Printf("%+v\n", ans)
 
 	listener.Wait()
 
