@@ -11,9 +11,7 @@ import (
 
 func l2_add(client p4.P4RuntimeClient, tableId uint32, matchId uint32, egress uint32, val byte, port byte) {
 	ans, err := client.Write(context.Background(), &p4.WriteRequest{
-		DeviceId:   1,
-		RoleId:     2,
-		ElectionId: &Uint128{High: 10000, Low: 9999},
+		DeviceId: 1,
 		Updates: []*p4.Update{
 			&p4.Update{
 				Type: p4.Update_INSERT,
