@@ -10,50 +10,40 @@ import (
 )
 
 func l2_add(client p4.P4RuntimeClient, tableId uint32, matchId uint32, egress uint32, val byte, port byte) {
-	ans, err := client.Write(context.Background(), &p4.WriteRequest{
-		DeviceId: 1,
-		Updates: []*p4.Update{
-			&p4.Update{
-				Type: p4.Update_INSERT,
-				Entity: &p4.Entity{
-					Entity: &p4.Entity_TableEntry{
-						TableEntry: &p4.TableEntry{
-							TableId: tableId,
-							Match: []*p4.FieldMatch{
-								&p4.FieldMatch{
-									FieldId: matchId,
-									FieldMatchType: &p4.FieldMatch_Exact_{
-										Exact: &p4.FieldMatch_Exact{
-											Value: []byte{0x00, 0x00, 0x0a, 0x00, 0x00, val},
-										},
-									},
-								},
-							},
-							Action: &p4.TableAction{
-								Type: &p4.TableAction_Action{
-									Action: &p4.Action{
-										ActionId: egress,
-										Params: []*p4.Action_Param{
-											&p4.Action_Param{
-												ParamId: egress,
-												Value:   []byte{port, 0x00},
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	})
-	if err != nil {
-		fmt.Printf("error occured (env: %v)", val)
-		log.Fatal(err)
-		return
+	var tableEntry p4.TableEntry
+	tableEntry.TableId = tableId
+	matchList := make([]*p4.FieldMatch, 1)
+	ExactMatch := p4.FieldMatch_Exact{Value: []byte{0x00, 0x00, 0x0a, 0x00, 0x00, val}}
+	matchList[0] = &p4.FieldMatch{
+		FieldId:        matchId,
+		FieldMatchType: &p4.FieldMatch_Exact_{Exact: &ExactMatch},
 	}
-	fmt.Printf("success - %v\n", ans.String())
+	egressParam := p4.Action_Param{ParamId: 1, Value: []byte{port}}
+	// 2 action params
+	paramList := make([]*p4.Action_Param, 1)
+	paramList[0] = &egressParam
+	action := p4.Action{ActionId: egress, Params: paramList}
+	tableAction := p4.TableAction_Action{Action: &action}
+	tableEntry.Match = matchList
+	tableEntry.Action = &p4.TableAction{Type: &tableAction}
+
+	//fmt.Printf("%+v", tableEntry)
+
+	// Ship this table entry to the RT agent in the switch
+	tabEntity := &p4.Entity_TableEntry{TableEntry: &tableEntry}
+	entity := &p4.Entity{Entity: tabEntity}
+	updates := make([]*p4.Update, 1)
+	singleUpdate := &p4.Update{Type: p4.Update_INSERT, Entity: entity}
+	fmt.Printf("%v\n", singleUpdate)
+	updates[0] = singleUpdate
+	_, errw := client.Write(context.Background(),
+		&p4.WriteRequest{DeviceId: 1,
+			ElectionId: &p4.Uint128{High: 10000, Low: 9999},
+			Updates:    updates})
+	if errw != nil {
+		log.Fatalf("Error sending table entry to rt agent in switch")
+	}
+	fmt.Printf("success -\n")
 }
 
 func setTable(client p4.P4RuntimeClient) {
