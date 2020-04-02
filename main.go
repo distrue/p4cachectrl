@@ -11,12 +11,11 @@ import (
 
 func l2_add(client p4.P4RuntimeClient, tableId uint32, matchId uint32, egress uint32, val byte, port byte) {
 	ans, err := client.Write(context.Background(), &p4.WriteRequest{
-		DeviceId:   1,
-		RoleId:     2,
-		ElectionId: &p4.Uint128{High: 10000, Low: 9999},
+		DeviceId: 1,
+		RoleId:   2,
 		Updates: []*p4.Update{
 			&p4.Update{
-				Type: 1,
+				Type: p4.Update_INSERT,
 				Entity: &p4.Entity{
 					Entity: &p4.Entity_TableEntry{
 						TableEntry: &p4.TableEntry{
@@ -38,7 +37,7 @@ func l2_add(client p4.P4RuntimeClient, tableId uint32, matchId uint32, egress ui
 										Params: []*p4.Action_Param{
 											&p4.Action_Param{
 												ParamId: egress,
-												Value:   []byte{port},
+												Value:   []byte{port, 0x00},
 											},
 										},
 									},
@@ -103,7 +102,6 @@ func main() {
 		fmt.Println(sErr)
 		log.Fatalf("cannot open stream channel with the server")
 	}
-
 	listener := p4.OpenStreamListener(stream)
 
 	p4.SetMastership(stream)
@@ -112,7 +110,9 @@ func main() {
 
 	p4.PrintTables(client)
 
+	// Entry Setup
 	setTable(client)
+
 	time.Sleep(1000 * time.Millisecond)
 
 	// Config Print
