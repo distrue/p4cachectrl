@@ -6,67 +6,87 @@ import (
 	"log"
 	"time"
 
-	p4Config "github.com/distrue/gencachectrl/p4/config/v1"
 	p4 "github.com/distrue/gencachectrl/p4/v1"
 )
 
-func setTableExample(client p4.P4RuntimeClient) {
-	table := p4Config.CreateTable()
-	table.AddPreamble(
-		p4Config.CreatePreamble(
-			33596298,
-			"FabricIngress.filtering.fwd_classifier",
-			"fwd_classifier",
-		),
-	)
-
-	table.AddMatchField(
-		p4Config.CreateMatchField(
-			1,
-			"ig_port",
-			nil,
-			9,
-			p4Config.MatchField_EXACT,
-		),
-	)
-
-	table.AddMatchField(
-		p4Config.CreateMatchField(
-			2,
-			"eth_dst",
-			nil,
-			48,
-			p4Config.MatchField_TERNARY,
-		),
-	)
-
-	table.AddMatchField(
-		p4Config.CreateMatchField(
-			3,
-			"eth_type",
-			nil,
-			16,
-			p4Config.MatchField_EXACT,
-		),
-	)
-
-	table.AddActionRef(
-		p4Config.CreateActionRef(
-			16840921,
-			p4Config.ActionRef_TABLE_AND_DEFAULT,
-			nil,
-		),
-	)
-
-	info := p4Config.P4Info{
-		Tables: []*p4Config.Table{
-			&table,
+func l2_add(client p4.P4RuntimeClient, tableId uint32, matchId uint32, egress uint32, val byte, port byte) {
+	client.Write(context.Background(), &p4.WriteRequest{
+		DeviceId:   1,
+		RoleId:     2,
+		ElectionId: &p4.Uint128{High: 10000, Low: 9999},
+		Updates: []*p4.Update{
+			&p4.Update{
+				Type: 1,
+				Entity: &p4.Entity{
+					Entity: &p4.Entity_TableEntry{
+						TableEntry: &p4.TableEntry{
+							TableId: tableId,
+							Match: []*p4.FieldMatch{
+								&p4.FieldMatch{
+									FieldId: matchId,
+									FieldMatchType: &p4.FieldMatch_Exact_{
+										Exact: &p4.FieldMatch_Exact{
+											Value: []byte{0x00, 0x00, 0x0a, 0x00, 0x00, val},
+										},
+									},
+								},
+							},
+							Action: &p4.TableAction{
+								Type: &p4.TableAction_Action{
+									Action: &p4.Action{
+										ActionId: egress,
+										Params: []*p4.Action_Param{
+											&p4.Action_Param{
+												ParamId: egress,
+												Value:   []byte{port},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
 		},
+	})
+}
+
+func setTable(client p4.P4RuntimeClient) {
+	cfg, err := p4.GetPipelineConfigs(client)
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	fmt.Printf("%+v\n", info)
-
-	p4.SetPipelineConfig(client, &info)
+	var tableId uint32 = 0
+	var matchId uint32 = 0
+	var egress uint32 = 0
+	for _, table := range cfg.Tables {
+		if table.Preamble.GetName() == "MyIngress.l2_forward" {
+			tableId = table.Preamble.GetId()
+			for _, match := range table.MatchFields {
+				if match.GetName() == "hdr.ethernet.dstAddr" {
+					matchId = match.GetId()
+				}
+			}
+			// MyIngress.l2_forward find
+			for _, action := range cfg.Actions {
+				if action.Preamble.GetName() == "set_egress_port" {
+					egress = action.Preamble.GetId()
+				}
+			}
+		}
+	}
+	l2_add(client, tableId, matchId, egress, 0x01, 0x01)
+	l2_add(client, tableId, matchId, egress, 0x02, 0x02)
+	l2_add(client, tableId, matchId, egress, 0x03, 0x03)
+	l2_add(client, tableId, matchId, egress, 0x04, 0x04)
+	l2_add(client, tableId, matchId, egress, 0x05, 0x05)
+	l2_add(client, tableId, matchId, egress, 0x06, 0x06)
+	l2_add(client, tableId, matchId, egress, 0x07, 0x07)
+	l2_add(client, tableId, matchId, egress, 0x08, 0x08)
+	l2_add(client, tableId, matchId, egress, 0x09, 0x09)
+	l2_add(client, tableId, matchId, egress, 0x0a, 0xc8)
 }
 
 func main() {
@@ -81,10 +101,12 @@ func main() {
 	listener := p4.OpenStreamListener(stream)
 
 	p4.SetMastership(stream)
+
 	p4.SetPipelineConfigFromFile(client, "resources/p4info.txt")
+
 	p4.PrintTables(client)
 
-	// setTableExample(client)
+	setTable(client)
 	time.Sleep(1000 * time.Millisecond)
 
 	newConfig, err := p4.GetPipelineConfigs(client)
