@@ -51,10 +51,11 @@ func l2_add(client p4.P4RuntimeClient, tableId uint32, matchId uint32, egress ui
 		},
 	})
 	if err != nil {
+		fmt.Printf("error occured (env: %v)", val)
 		log.Fatal(err)
 		return
 	}
-	fmt.Printf("%v\n", ans)
+	fmt.Printf("success - %v\n", ans.String())
 }
 
 func setTable(client p4.P4RuntimeClient) {
@@ -114,11 +115,14 @@ func main() {
 	setTable(client)
 	time.Sleep(1000 * time.Millisecond)
 
-	newConfig, err := p4.GetPipelineConfigs(client)
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Printf("%+v\n", newConfig)
+	// Config Print
+	/*
+		newConfig, err := p4.GetPipelineConfigs(client)
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Printf("%+v\n", newConfig)
+	*/
 
 	// Packet Out - controller instance to switch
 	/*
@@ -144,8 +148,8 @@ func main() {
 	*/
 
 	// PacketIn - switch to controller instance
-	ans, err := stream.Recv()
-	fmt.Printf("%+v\n", ans)
+	// ans, err := stream.Recv()
+	// fmt.Printf("%+v\n", ans)
 
 	listener.Wait()
 
