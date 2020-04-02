@@ -10,7 +10,7 @@ import (
 )
 
 func l2_add(client p4.P4RuntimeClient, tableId uint32, matchId uint32, egress uint32, val byte, port byte) {
-	client.Write(context.Background(), &p4.WriteRequest{
+	ans, err := client.Write(context.Background(), &p4.WriteRequest{
 		DeviceId:   1,
 		RoleId:     2,
 		ElectionId: &p4.Uint128{High: 10000, Low: 9999},
@@ -50,6 +50,11 @@ func l2_add(client p4.P4RuntimeClient, tableId uint32, matchId uint32, egress ui
 			},
 		},
 	})
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+	fmt.Printf("%v\n", ans)
 }
 
 func setTable(client p4.P4RuntimeClient) {
