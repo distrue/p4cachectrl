@@ -18,7 +18,7 @@ func l2_add(client p4.P4RuntimeClient, tableId uint32, matchId uint32, egress ui
 		FieldId:        matchId,
 		FieldMatchType: &p4.FieldMatch_Exact_{Exact: &ExactMatch},
 	}
-	egressParam := p4.Action_Param{ParamId: 1, Value: []byte{port}}
+	egressParam := p4.Action_Param{ParamId: 1, Value: []byte{0x00, port}}
 	// 2 action params
 	paramList := make([]*p4.Action_Param, 1)
 	paramList[0] = &egressParam
@@ -41,7 +41,8 @@ func l2_add(client p4.P4RuntimeClient, tableId uint32, matchId uint32, egress ui
 			ElectionId: &p4.Uint128{High: 10000, Low: 9999},
 			Updates:    updates})
 	if errw != nil {
-		log.Fatalf("Error sending table entry to rt agent in switch")
+	    fmt.Println(errw)
+    	log.Fatalf("Error sending table entry to rt agent in switch")
 	}
 	fmt.Printf("success -\n")
 }
@@ -65,13 +66,14 @@ func setTable(client p4.P4RuntimeClient) {
 			}
 			// MyIngress.l2_forward find
 			for _, action := range cfg.Actions {
-				if action.Preamble.GetName() == "set_egress_port" {
+				if action.Preamble.GetName() == "MyIngress.set_egress_port" {
 					egress = action.Preamble.GetId()
 				}
 			}
 		}
 	}
-	l2_add(client, tableId, matchId, egress, 0x01, 0x01)
+	fmt.Printf("%v %v %v\n", tableId, matchId, egress)
+    l2_add(client, tableId, matchId, egress, 0x01, 0x01)
 	l2_add(client, tableId, matchId, egress, 0x02, 0x02)
 	l2_add(client, tableId, matchId, egress, 0x03, 0x03)
 	l2_add(client, tableId, matchId, egress, 0x04, 0x04)

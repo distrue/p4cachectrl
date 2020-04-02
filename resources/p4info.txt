@@ -40,5 +40,16 @@ actions {
     bitwidth: 9
   }
 }
+counters {
+  preamble {
+    id: 301995959
+    name: "MyEgress.packet_freq_cnt"
+    alias: "packet_freq_cnt"
+  }
+  spec {
+    unit: PACKETS
+  }
+  size: 65535
+}
 type_info {
 }
