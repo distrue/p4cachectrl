@@ -106,9 +106,9 @@ func main() {
 
 	time.Sleep(1000 * time.Millisecond)
 
-	// PacketIn Receiver
 	var sum = 0
 	for sum < 1000 {
+		// PacketIn
 		res, err := stream.Recv()
 		if err != nil {
 			log.Fatal(err)
@@ -116,6 +116,19 @@ func main() {
 		packet := res.GetPacket()
 		fmt.Printf("%+v\n", packet.Payload)
 		sum += 1
+		packet.Payload[6] = 1
+		// PacketOut
+		req := p4.StreamMessageRequest{
+			Update: &p4.StreamMessageRequest_Packet{
+				Packet: &p4.PacketOut{
+					Payload: packet.Payload,
+				},
+			},
+		}
+		err = stream.Send(&req)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 
 	// Config Print
@@ -126,33 +139,6 @@ func main() {
 		}
 		fmt.Printf("%+v\n", newConfig)
 	*/
-
-	// Packet Out - controller instance to switch
-	/*
-		req := p4.StreamMessageRequest{
-			Update: &p4.StreamMessageRequest_Packet{
-				Packet: &p4.PacketOut{
-					Payload: []byte("PAYLOAD"), // []byte
-					Metadata: []*p4.PacketMetadata{
-						&p4.PacketMetadata{},
-					},
-					XXX_NoUnkeyedLiteral: struct{}{},
-					XXX_unrecognized:     []byte("unrecognized"), // []byte
-					XXX_sizecache:        2048,
-				},
-			},
-		}
-
-		err = stream.Send(&req)
-		if err != nil {
-			fmt.Println("ERROR SENDING STREAM REQUEST:")
-			fmt.Println(err)
-		}
-	*/
-
-	// PacketIn - switch to controller instance
-	// ans, err := stream.Recv()
-	// fmt.Printf("%+v\n", ans)
 
 	listener.Wait()
 
