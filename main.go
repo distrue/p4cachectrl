@@ -41,8 +41,8 @@ func l2_add(client p4.P4RuntimeClient, tableId uint32, matchId uint32, egress ui
 			ElectionId: &p4.Uint128{High: 10000, Low: 9999},
 			Updates:    updates})
 	if errw != nil {
-	    fmt.Println(errw)
-    	log.Fatalf("Error sending table entry to rt agent in switch")
+		fmt.Println(errw)
+		log.Fatalf("Error sending table entry to rt agent in switch")
 	}
 	fmt.Printf("success -\n")
 }
@@ -73,7 +73,7 @@ func setTable(client p4.P4RuntimeClient) {
 		}
 	}
 	fmt.Printf("%v %v %v\n", tableId, matchId, egress)
-    l2_add(client, tableId, matchId, egress, 0x01, 0x01)
+	l2_add(client, tableId, matchId, egress, 0x01, 0x01)
 	l2_add(client, tableId, matchId, egress, 0x02, 0x02)
 	l2_add(client, tableId, matchId, egress, 0x03, 0x03)
 	l2_add(client, tableId, matchId, egress, 0x04, 0x04)
@@ -105,6 +105,18 @@ func main() {
 	setTable(client)
 
 	time.Sleep(1000 * time.Millisecond)
+
+	// PacketIn Receiver
+	var sum = 0
+	for sum < 1000 {
+		res, err := stream.Recv()
+		if err != nil {
+			log.Fatal(err)
+		}
+		packet := res.GetPacket()
+		fmt.Printf("%+v\n", packet.Payload)
+		sum += 1
+	}
 
 	// Config Print
 	/*
