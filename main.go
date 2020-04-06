@@ -116,7 +116,7 @@ func main() {
 		packet := res.GetPacket()
 		fmt.Printf("%+v\n", packet.Payload)
 		sum += 1
-		packet.Payload[6] = 1
+		packet.Payload[5] = 1
 		// PacketOut
 		req := p4.StreamMessageRequest{
 			Update: &p4.StreamMessageRequest_Packet{
