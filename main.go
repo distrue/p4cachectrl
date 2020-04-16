@@ -6,6 +6,7 @@ import (
 	"log"
 	"time"
 
+	p4Config "github.com/distrue/gencachectrl/p4/config/v1"
 	p4 "github.com/distrue/gencachectrl/p4/v1"
 )
 
@@ -19,6 +20,7 @@ func l2_add(client p4.P4RuntimeClient, tableId uint32, matchId uint32, egress ui
 		FieldMatchType: &p4.FieldMatch_Exact_{Exact: &ExactMatch},
 	}
 	egressParam := p4.Action_Param{ParamId: 1, Value: []byte{0x00, port}}
+
 	// 2 action params
 	paramList := make([]*p4.Action_Param, 1)
 	paramList[0] = &egressParam
@@ -26,8 +28,6 @@ func l2_add(client p4.P4RuntimeClient, tableId uint32, matchId uint32, egress ui
 	tableAction := p4.TableAction_Action{Action: &action}
 	tableEntry.Match = matchList
 	tableEntry.Action = &p4.TableAction{Type: &tableAction}
-
-	//fmt.Printf("%+v", tableEntry)
 
 	// Ship this table entry to the RT agent in the switch
 	tabEntity := &p4.Entity_TableEntry{TableEntry: &tableEntry}
@@ -47,15 +47,11 @@ func l2_add(client p4.P4RuntimeClient, tableId uint32, matchId uint32, egress ui
 	fmt.Printf("success -\n")
 }
 
-func setTable(client p4.P4RuntimeClient) {
-	cfg, err := p4.GetPipelineConfigs(client)
-	if err != nil {
-		log.Fatal(err)
-	}
-
+func configParser(cfg *p4Config.P4Info) (uint32, uint32, uint32) {
 	var tableId uint32 = 0
 	var matchId uint32 = 0
 	var egress uint32 = 0
+
 	for _, table := range cfg.Tables {
 		if table.Preamble.GetName() == "MyIngress.l2_forward" {
 			tableId = table.Preamble.GetId()
@@ -72,21 +68,57 @@ func setTable(client p4.P4RuntimeClient) {
 			}
 		}
 	}
+
+	return tableId, matchId, egress
+}
+
+func setTable(client p4.P4RuntimeClient) {
+	cfg, err := p4.GetPipelineConfigs(client)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	tableId, matchId, egress := configParser(cfg)
 	fmt.Printf("%v %v %v\n", tableId, matchId, egress)
-	l2_add(client, tableId, matchId, egress, 0x01, 0x01)
-	l2_add(client, tableId, matchId, egress, 0x02, 0x02)
-	l2_add(client, tableId, matchId, egress, 0x03, 0x03)
-	l2_add(client, tableId, matchId, egress, 0x04, 0x04)
-	l2_add(client, tableId, matchId, egress, 0x05, 0x05)
-	l2_add(client, tableId, matchId, egress, 0x06, 0x06)
-	l2_add(client, tableId, matchId, egress, 0x07, 0x07)
-	l2_add(client, tableId, matchId, egress, 0x08, 0x08)
-	l2_add(client, tableId, matchId, egress, 0x09, 0x09)
+
+	idx := byte(0)
+	for idx <= byte(9) {
+		l2_add(client, tableId, matchId, egress, idx, idx)
+		idx = idx + byte(1)
+	}
 	l2_add(client, tableId, matchId, egress, 0x0a, 0xc8)
 }
 
-func main() {
+func gencache_func(src []byte) {
+	// ongoing
+	/*
+		parsed := gopacket.NewPacket(packet.Payload, gopacket.layers.IPv4, gopacket.Default)
+		if gopacket.layers.TCP.canDecode(parsed.payload) {
+			// tcp decode
+		}
+		if gopacket.layers.UDP.canDecode(parsed.payload) {
+			// udp decode
+		}
+	*/
+}
 
+func print_cfg(client p4.P4RuntimeClient) {
+	newConfig, err := p4.GetPipelineConfigs(client)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("%+v\n", newConfig)
+}
+
+func main() {
+	/*
+		1. connect to P4Runtime
+		2. set Role of connection
+		3. Packet I/O for gencache
+		4. listen
+	*/
+
+	// 1. connect to P4Runtime
 	client := p4.GetClient("localhost:50051")
 	stream, sErr := client.StreamChannel(context.Background())
 	if sErr != nil {
@@ -95,19 +127,15 @@ func main() {
 	}
 	listener := p4.OpenStreamListener(stream)
 
+	// 2. set Role of connection
 	p4.SetMastership(stream)
-
 	p4.SetPipelineConfigFromFile(client, "resources/p4info.txt")
-
-	p4.PrintTables(client)
-
-	// Entry Setup
-	setTable(client)
-
+	// p4.PrintTables(client)
+	setTable(client) // Entry Setup
 	time.Sleep(1000 * time.Millisecond)
 
-	var sum = 0
-	for sum < 1000 {
+	// 3. Packet I/O for gencache
+	for {
 		// PacketIn
 		res, err := stream.Recv()
 		if err != nil {
@@ -115,8 +143,12 @@ func main() {
 		}
 		packet := res.GetPacket()
 		fmt.Printf("%+v\n", packet.Payload)
-		sum += 1
+
+		gencache_func(packet.Payload)
+
+		// Resend to 10.0.0.1
 		packet.Payload[5] = 1
+
 		// PacketOut
 		req := p4.StreamMessageRequest{
 			Update: &p4.StreamMessageRequest_Packet{
@@ -131,15 +163,7 @@ func main() {
 		}
 	}
 
-	// Config Print
-	/*
-		newConfig, err := p4.GetPipelineConfigs(client)
-		if err != nil {
-			log.Fatal(err)
-		}
-		fmt.Printf("%+v\n", newConfig)
-	*/
-
+	// 4. listen
 	listener.Wait()
 
 }
