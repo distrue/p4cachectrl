@@ -9,6 +9,8 @@ import (
 	cuckoo "github.com/distrue/gencachectrl/cuckoo"
 	p4Config "github.com/distrue/gencachectrl/p4/config/v1"
 	p4 "github.com/distrue/gencachectrl/p4/v1"
+	gopacket "github.com/google/gopacket"
+	layers "github.com/google/gopacket/layers"
 )
 
 func l2_add(client p4.P4RuntimeClient, tableId uint32, matchId uint32, egress uint32, val byte, port byte) {
@@ -48,7 +50,7 @@ func l2_add(client p4.P4RuntimeClient, tableId uint32, matchId uint32, egress ui
 	fmt.Printf("success -\n")
 }
 
-func configParser(cfg *p4Config.P4Info) (uint32, uint32, uint32) {
+func parseL2ForwardFromCfg(cfg *p4Config.P4Info) (uint32, uint32, uint32) {
 	var tableId uint32 = 0
 	var matchId uint32 = 0
 	var egress uint32 = 0
@@ -73,13 +75,38 @@ func configParser(cfg *p4Config.P4Info) (uint32, uint32, uint32) {
 	return tableId, matchId, egress
 }
 
+func parseLookupFromCfg(cfg *p4Config.P4Info) (uint32, uint32, uint32) {
+	var tableId uint32 = 0
+	var matchId uint32 = 0
+	var egress uint32 = 0
+
+	for _, table := range cfg.Tables {
+		if table.Preamble.GetName() == "MyIngress.lookup_table" {
+			tableId = table.Preamble.GetId()
+			for _, match := range table.MatchFields {
+				if match.GetName() == "hdr.gencache.key" {
+					matchId = match.GetId()
+				}
+			}
+			// MyIngress.l2_forward find
+			for _, action := range cfg.Actions {
+				if action.Preamble.GetName() == "MyIngress.set_lookup_metadata" {
+					egress = action.Preamble.GetId()
+				}
+			}
+		}
+	}
+
+	return tableId, matchId, egress
+}
+
 func setTable(client p4.P4RuntimeClient) {
 	cfg, err := p4.GetPipelineConfigs(client)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	tableId, matchId, egress := configParser(cfg)
+	tableId, matchId, egress := parseL2ForwardFromCfg(cfg)
 	fmt.Printf("%v %v %v\n", tableId, matchId, egress)
 
 	idx := byte(0)
@@ -90,9 +117,10 @@ func setTable(client p4.P4RuntimeClient) {
 	l2_add(client, tableId, matchId, egress, 0x0a, 0xc8)
 }
 
-func gencache_func(src []byte, filter *cuckoo.Cuckoo) {
-	fmt.Printf("%v\n", string(src))
+func gencache_func(src []byte, filter *cuckoo.Cuckoo, stream p4.P4Runtime_StreamChannelClient) {
 	// ongoing
+	parse := gopacket.NewPacket(src, layers.LayerTypeIPv4, gopacket.Default)
+	fmt.Printf("%v \n", parse.Layers())
 	/*
 		parsed := gopacket.NewPacket(packet.Payload, gopacket.layers.IPv4, gopacket.Default)
 		if gopacket.layers.TCP.canDecode(parsed.payload) {
@@ -102,6 +130,21 @@ func gencache_func(src []byte, filter *cuckoo.Cuckoo) {
 			// udp decode
 		}
 	*/
+	// Resend to 10.0.0.1
+	src[5] = 1
+
+	// PacketOut
+	req := p4.StreamMessageRequest{
+		Update: &p4.StreamMessageRequest_Packet{
+			Packet: &p4.PacketOut{
+				Payload: src,
+			},
+		},
+	}
+	err := stream.Send(&req)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 func print_cfg(client p4.P4RuntimeClient) {
@@ -147,23 +190,7 @@ func main() {
 		packet := res.GetPacket()
 		fmt.Printf("%+v\n", packet.Payload)
 
-		gencache_func(packet.Payload, filter)
-
-		// Resend to 10.0.0.1
-		packet.Payload[5] = 1
-
-		// PacketOut
-		req := p4.StreamMessageRequest{
-			Update: &p4.StreamMessageRequest_Packet{
-				Packet: &p4.PacketOut{
-					Payload: packet.Payload,
-				},
-			},
-		}
-		err = stream.Send(&req)
-		if err != nil {
-			log.Fatal(err)
-		}
+		gencache_func(packet.Payload, filter, stream)
 	}
 
 	// 4. listen
