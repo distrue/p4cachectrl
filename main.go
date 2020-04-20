@@ -147,7 +147,7 @@ func main() {
 		packet := res.GetPacket()
 		fmt.Printf("%+v\n", packet.Payload)
 
-		gencache_func(packet.Payload, &filter)
+		gencache_func(packet.Payload, filter)
 
 		// Resend to 10.0.0.1
 		packet.Payload[5] = 1
