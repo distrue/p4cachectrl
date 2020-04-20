@@ -6,6 +6,7 @@ import (
 	"log"
 	"time"
 
+	cuckoo "github.com/distrue/gencachectrl/cuckoo"
 	p4Config "github.com/distrue/gencachectrl/p4/config/v1"
 	p4 "github.com/distrue/gencachectrl/p4/v1"
 )
@@ -89,7 +90,8 @@ func setTable(client p4.P4RuntimeClient) {
 	l2_add(client, tableId, matchId, egress, 0x0a, 0xc8)
 }
 
-func gencache_func(src []byte) {
+func gencache_func(src []byte, filter *cuckoo.Cuckoo) {
+	fmt.Printf("%v\n", string(src))
 	// ongoing
 	/*
 		parsed := gopacket.NewPacket(packet.Payload, gopacket.layers.IPv4, gopacket.Default)
@@ -135,6 +137,7 @@ func main() {
 	time.Sleep(1000 * time.Millisecond)
 
 	// 3. Packet I/O for gencache
+	filter := cuckoo.NewCuckoo(10, 0.1)
 	for {
 		// PacketIn
 		res, err := stream.Recv()
@@ -144,7 +147,7 @@ func main() {
 		packet := res.GetPacket()
 		fmt.Printf("%+v\n", packet.Payload)
 
-		gencache_func(packet.Payload)
+		gencache_func(packet.Payload, &filter)
 
 		// Resend to 10.0.0.1
 		packet.Payload[5] = 1
