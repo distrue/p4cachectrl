@@ -40,16 +40,28 @@ actions {
     bitwidth: 9
   }
 }
-counters {
+controller_packet_metadata {
   preamble {
-    id: 301995959
-    name: "MyEgress.packet_freq_cnt"
-    alias: "packet_freq_cnt"
+    id: 67111538
+    name: "packet_in"
+    alias: "packet_in"
+    annotations: "@controller_header(\"packet_in\")"
   }
-  spec {
-    unit: PACKETS
+  metadata {
+    id: 1
+    name: "dstAddr"
+    bitwidth: 48
   }
-  size: 65535
+  metadata {
+    id: 2
+    name: "srcAddr"
+    bitwidth: 48
+  }
+  metadata {
+    id: 3
+    name: "etherType"
+    bitwidth: 16
+  }
 }
 type_info {
 }

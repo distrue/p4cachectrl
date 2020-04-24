@@ -109,7 +109,7 @@ func setTable(client p4.P4RuntimeClient) {
 	tableId, matchId, egress := parseL2ForwardFromCfg(cfg)
 	fmt.Printf("%v %v %v\n", tableId, matchId, egress)
 
-	idx := byte(0)
+	idx := byte(1)
 	for idx <= byte(9) {
 		l2_add(client, tableId, matchId, egress, idx, idx)
 		idx = idx + byte(1)
