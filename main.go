@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"reflect"
+	"strconv"
+	"strings"
 	"time"
 
 	cuckoo "github.com/distrue/gencachectrl/cuckoo"
@@ -15,16 +18,16 @@ import (
 	layers "github.com/google/gopacket/layers"
 )
 
-func l2_add(client p4.P4RuntimeClient, tableId uint32, matchId uint32, egress uint32, val byte, port byte) {
+func l4_add(client p4.P4RuntimeClient, tableId uint32, matchId uint32, egress uint32, ipv4 []byte, mac []byte, port byte) {
 	var tableEntry p4.TableEntry
 	tableEntry.TableId = tableId
 	matchList := make([]*p4.FieldMatch, 1)
-	LPMMatch := p4.FieldMatch_LPM{Value: []byte{0x0a, 0x00, 0x00, val}}
+	LPMMatch := p4.FieldMatch_LPM{Value: ipv4, PrefixLen: 32}
 	matchList[0] = &p4.FieldMatch{
 		FieldId:        matchId,
 		FieldMatchType: &p4.FieldMatch_Lpm{Lpm: &LPMMatch},
 	}
-	egressParam := p4.Action_Param{ParamId: 1, Value: []byte{0x00, 0x00, 0x0a, 0x00, 0x00, val}}
+	egressParam := p4.Action_Param{ParamId: 1, Value: mac}
 	egressParam2 := p4.Action_Param{ParamId: 2, Value: []byte{0x00, port}}
 
 	// 2 action params
@@ -104,7 +107,7 @@ func parseLookupFromCfg(cfg *p4Config.P4Info) (uint32, uint32, uint32) {
 	return tableId, matchId, egress
 }
 
-func setTable(client p4.P4RuntimeClient) {
+func setTable(client p4.P4RuntimeClient, mac string) {
 	cfg, err := p4.GetPipelineConfigs(client)
 	if err != nil {
 		log.Fatal(err)
@@ -115,10 +118,21 @@ func setTable(client p4.P4RuntimeClient) {
 
 	idx := byte(1)
 	for idx <= byte(9) {
-		l2_add(client, tableId, matchId, egress, idx, idx)
+		ipmatch := []byte{0x0a, 0x00, 0x00, idx}
+		mac := []byte{0x00, 0x00, 0x0a, 0x00, 0x00, idx}
+		port := idx
+		l4_add(client, tableId, matchId, egress, ipmatch, mac, port)
 		idx = idx + byte(1)
 	}
-	l2_add(client, tableId, matchId, egress, 0x0a, 0xc8)
+
+	x := strings.Split(mac, ":")
+	y := make([]byte, 6)
+	for idx, it := range x {
+		num, err := strconv.Atoi(it)
+		n := byte(num)
+		y[idx] = n
+	}
+	l4_add(client, tableId, matchId, egress, []byte{0x0a, 0x00, 0x00, 0x0a}, y, 0xc8)
 }
 
 func gencache_func(src []byte, filter *cuckoo.Cuckoo, stream p4.P4Runtime_StreamChannelClient) {
@@ -159,6 +173,30 @@ func print_cfg(client p4.P4RuntimeClient) {
 	fmt.Printf("%+v\n", newConfig)
 }
 
+type Node map[string]interface{}
+
+func NewNode(target interface{}) Node {
+	data := target.(map[string]interface{})
+	return data
+}
+
+func JSONFinder(bundle interface{}, path []string) interface{} {
+	if len(path) == 0 {
+		return bundle
+	}
+	data := NewNode(bundle)
+	rt := reflect.TypeOf(data)
+	if rt.Kind() != reflect.Map {
+		return nil
+	}
+	for key, item := range data {
+		if key == path[0] {
+			return JSONFinder(item, path[1:])
+		}
+	}
+	return nil
+}
+
 func main() {
 	/*
 		1. connect to P4Runtime
@@ -173,20 +211,13 @@ func main() {
 		log.Fatalf("cannot read topology file")
 	}
 
-	type Node map[string]interface{}
-
-	var data map[string]Node
-	err = json.Unmarshal([]byte(file), &data)
+	var data interface{}
+	err = json.Unmarshal(file, &data)
 	if err != nil {
 		fmt.Println(err)
 	}
-	for key, item := range data {
-		fmt.Printf("%v: ->>\n", key)
-		for k, it := range item {
-			fmt.Printf("%v: %v \n", k, it)
-		}
-		fmt.Println()
-	}
+	mac := JSONFinder(data, []string{"s1", "sw-cpu", "mac"})
+	mac = mac.(string)
 
 	// 1. connect to P4Runtime
 	client := p4.GetClient("localhost:50051")
@@ -202,7 +233,7 @@ func main() {
 	// sudo p4c --target bmv2 --arch v1model --std p4-16 "gencache.p4" --p4runtime-files p4info.txt
 	p4.SetPipelineConfigFromFile(client, "p4info.txt")
 	// p4.PrintTables(client)
-	setTable(client) // Entry Setup
+	setTable(client, mac) // Entry Setup
 	time.Sleep(1000 * time.Millisecond)
 
 	// 3. Packet I/O for gencache
