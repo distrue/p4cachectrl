@@ -217,7 +217,6 @@ func main() {
 		fmt.Println(err)
 	}
 	mac := JSONFinder(data, []string{"s1", "sw-cpu", "mac"})
-	mac = mac.(string)
 
 	// 1. connect to P4Runtime
 	client := p4.GetClient("localhost:50051")
@@ -233,7 +232,7 @@ func main() {
 	// sudo p4c --target bmv2 --arch v1model --std p4-16 "gencache.p4" --p4runtime-files p4info.txt
 	p4.SetPipelineConfigFromFile(client, "p4info.txt")
 	// p4.PrintTables(client)
-	setTable(client, mac) // Entry Setup
+	setTable(client, mac.(string)) // Entry Setup
 	time.Sleep(1000 * time.Millisecond)
 
 	// 3. Packet I/O for gencache
