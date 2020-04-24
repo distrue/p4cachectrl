@@ -3,23 +3,53 @@ pkg_info {
 }
 tables {
   preamble {
-    id: 33616955
-    name: "MyIngress.l2_forward"
-    alias: "l2_forward"
+    id: 33574068
+    name: "MyIngress.ipv4_lpm"
+    alias: "ipv4_lpm"
   }
   match_fields {
     id: 1
-    name: "hdr.ethernet.dstAddr"
-    bitwidth: 48
-    match_type: EXACT
+    name: "hdr.ipv4.dstAddr"
+    bitwidth: 32
+    match_type: LPM
   }
   action_refs {
-    id: 16777697
+    id: 16799317
   }
   action_refs {
     id: 16805608
   }
+  action_refs {
+    id: 16800567
+  }
   size: 1024
+}
+tables {
+  preamble {
+    id: 33619322
+    name: "MyIngress.lookup_table"
+    alias: "lookup_table"
+  }
+  match_fields {
+    id: 1
+    name: "hdr.gencache.key"
+    bitwidth: 640
+    match_type: EXACT
+  }
+  action_refs {
+    id: 16780204
+  }
+  action_refs {
+    id: 16800567
+  }
+  size: 65536
+}
+actions {
+  preamble {
+    id: 16800567
+    name: "NoAction"
+    alias: "NoAction"
+  }
 }
 actions {
   preamble {
@@ -30,38 +60,92 @@ actions {
 }
 actions {
   preamble {
-    id: 16777697
-    name: "MyIngress.set_egress_port"
-    alias: "set_egress_port"
+    id: 16799317
+    name: "MyIngress.ipv4_forward"
+    alias: "ipv4_forward"
   }
   params {
-    id: 1
-    name: "port"
-    bitwidth: 9
-  }
-}
-controller_packet_metadata {
-  preamble {
-    id: 67111538
-    name: "packet_in"
-    alias: "packet_in"
-    annotations: "@controller_header(\"packet_in\")"
-  }
-  metadata {
     id: 1
     name: "dstAddr"
     bitwidth: 48
   }
-  metadata {
+  params {
     id: 2
-    name: "srcAddr"
-    bitwidth: 48
+    name: "port"
+    bitwidth: 9
   }
-  metadata {
-    id: 3
-    name: "etherType"
-    bitwidth: 16
+}
+actions {
+  preamble {
+    id: 16780204
+    name: "MyIngress.set_lookup_metadata"
+    alias: "set_lookup_metadata"
   }
+  params {
+    id: 1
+    name: "last_commited"
+    bitwidth: 32
+  }
+}
+registers {
+  preamble {
+    id: 369125760
+    name: "MyIngress.dirtySet1"
+    alias: "dirtySet1"
+  }
+  type_spec {
+    bitstring {
+      bit {
+        bitwidth: 8
+      }
+    }
+  }
+  size: 65535
+}
+registers {
+  preamble {
+    id: 369102067
+    name: "MyIngress.dirtySet2"
+    alias: "dirtySet2"
+  }
+  type_spec {
+    bitstring {
+      bit {
+        bitwidth: 8
+      }
+    }
+  }
+  size: 65535
+}
+registers {
+  preamble {
+    id: 369140383
+    name: "MyIngress.dirtySet3"
+    alias: "dirtySet3"
+  }
+  type_spec {
+    bitstring {
+      bit {
+        bitwidth: 8
+      }
+    }
+  }
+  size: 65535
+}
+registers {
+  preamble {
+    id: 369116664
+    name: "MyIngress.dirtySet4"
+    alias: "dirtySet4"
+  }
+  type_spec {
+    bitstring {
+      bit {
+        bitwidth: 8
+      }
+    }
+  }
+  size: 65535
 }
 type_info {
 }
