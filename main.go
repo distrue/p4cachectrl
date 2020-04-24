@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"time"
 
@@ -17,16 +19,18 @@ func l2_add(client p4.P4RuntimeClient, tableId uint32, matchId uint32, egress ui
 	var tableEntry p4.TableEntry
 	tableEntry.TableId = tableId
 	matchList := make([]*p4.FieldMatch, 1)
-	ExactMatch := p4.FieldMatch_Exact{Value: []byte{0x00, 0x00, 0x0a, 0x00, 0x00, val}}
+	LPMMatch := p4.FieldMatch_LPM{Value: []byte{0x0a, 0x00, 0x00, val}}
 	matchList[0] = &p4.FieldMatch{
 		FieldId:        matchId,
-		FieldMatchType: &p4.FieldMatch_Exact_{Exact: &ExactMatch},
+		FieldMatchType: &p4.FieldMatch_Lpm{Lpm: &LPMMatch},
 	}
-	egressParam := p4.Action_Param{ParamId: 1, Value: []byte{0x00, port}}
+	egressParam := p4.Action_Param{ParamId: 1, Value: []byte{0x00, 0x00, 0x0a, 0x00, 0x00, val}}
+	egressParam2 := p4.Action_Param{ParamId: 2, Value: []byte{0x00, port}}
 
 	// 2 action params
-	paramList := make([]*p4.Action_Param, 1)
+	paramList := make([]*p4.Action_Param, 2)
 	paramList[0] = &egressParam
+	paramList[1] = &egressParam2
 	action := p4.Action{ActionId: egress, Params: paramList}
 	tableAction := p4.TableAction_Action{Action: &action}
 	tableEntry.Match = matchList
@@ -56,16 +60,16 @@ func parseL2ForwardFromCfg(cfg *p4Config.P4Info) (uint32, uint32, uint32) {
 	var egress uint32 = 0
 
 	for _, table := range cfg.Tables {
-		if table.Preamble.GetName() == "MyIngress.l2_forward" {
+		if table.Preamble.GetName() == "MyIngress.ipv4_lpm" {
 			tableId = table.Preamble.GetId()
 			for _, match := range table.MatchFields {
-				if match.GetName() == "hdr.ethernet.dstAddr" {
+				if match.GetName() == "hdr.ipv4.dstAddr" {
 					matchId = match.GetId()
 				}
 			}
 			// MyIngress.l2_forward find
 			for _, action := range cfg.Actions {
-				if action.Preamble.GetName() == "MyIngress.set_egress_port" {
+				if action.Preamble.GetName() == "MyIngress.ipv4_forward" {
 					egress = action.Preamble.GetId()
 				}
 			}
@@ -163,6 +167,27 @@ func main() {
 		4. listen
 	*/
 
+	file, err := ioutil.ReadFile("./topology.db")
+	if err != nil {
+		fmt.Println(err)
+		log.Fatalf("cannot read topology file")
+	}
+
+	type Node map[string]interface{}
+
+	var data map[string]Node
+	err = json.Unmarshal([]byte(file), &data)
+	if err != nil {
+		fmt.Println(err)
+	}
+	for key, item := range data {
+		fmt.Printf("%v: ->>\n", key)
+		for k, it := range item {
+			fmt.Printf("%v: %v \n", k, it)
+		}
+		fmt.Println()
+	}
+
 	// 1. connect to P4Runtime
 	client := p4.GetClient("localhost:50051")
 	stream, sErr := client.StreamChannel(context.Background())
@@ -174,7 +199,8 @@ func main() {
 
 	// 2. set Role of connection
 	p4.SetMastership(stream)
-	p4.SetPipelineConfigFromFile(client, "resources/p4info.txt")
+	// sudo p4c --target bmv2 --arch v1model --std p4-16 "gencache.p4" --p4runtime-files p4info.txt
+	p4.SetPipelineConfigFromFile(client, "p4info.txt")
 	// p4.PrintTables(client)
 	setTable(client) // Entry Setup
 	time.Sleep(1000 * time.Millisecond)
