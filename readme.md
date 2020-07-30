@@ -1,4 +1,4 @@
-## GENCACHE P4Runtime Controller
+## P4Runtime Controller
 
 * This controller is written on golang.
 
